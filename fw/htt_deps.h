@@ -1,8 +1,5 @@
 /*
- * Copyright (c) 2012 The Linux Foundation. All rights reserved.
- *
- * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
- *
+ * Copyright (c) 2011-2017 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -25,19 +22,21 @@
  * to the Linux Foundation.
  */
 
-#ifndef BIN_SIGN_H_
-#define BIN_SIGN_H_
+/**
+ * @file htt_deps.h
+ *
+ * @details list other header files that contain the defs for data types,
+ *      constants, and compiler pragmas used in the HTT header files
+ */
 
-/* Signed binary MetaData */
-typedef struct {
-    unsigned int magic_num;
-    unsigned int total_len;
-    unsigned int rampatch_len;
-    unsigned int product_id;
-    unsigned int patch_ver;
-    unsigned short sign_format_ver;
-    unsigned short sign_algorithm;
-    unsigned char reserved[8];
-} SIGN_HEADER_T;
+#ifndef _HTT_DEPS_H_
+#define _HTT_DEPS_H_
 
-#endif /*  BIN_SIGN_H_ */
+#include <a_types.h>    /* A_UINT32 */
+#include <a_osapi.h>    /* PREPACK, POSTPACK */
+#ifdef ATHR_WIN_NWF
+#pragma warning(disable:4214) /* bit field types other than int */
+#endif
+#include "wlan_defs.h"
+
+#endif /* _HTT_DEPS_H_ */
