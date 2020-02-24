@@ -143,6 +143,7 @@ enum htt_dbg_ext_stats_type {
      *           4 bit htt_tx_tid_stats_tlv/htt_tx_tid_stats_v1_tlv
      *           5 bit htt_rx_tid_stats_tlv
      *           6 bit htt_msdu_flow_stats_tlv
+     *           7 bit htt_peer_sched_stats_tlv
      *   - config_param2: [Bit31 : Bit0] mac_addr31to0
      *   - config_param3: [Bit15 : Bit0] mac_addr47to32
      *                    [Bit 16] If this bit is set, reset per peer stats
@@ -302,6 +303,22 @@ enum htt_dbg_ext_stats_type {
      */
     HTT_DBG_EXT_STATS_PDEV_UL_TRIG_STATS = 26,
 
+    /* HTT_DBG_EXT_STATS_PDEV_UL_MUMIMO_TRIG_STATS = 27
+     * PARAMS:
+     *   - No Params
+     * RESP MSG:
+     *   - htt_rx_pdev_ul_mumimo_trig_stats_t
+     */
+    HTT_DBG_EXT_STATS_PDEV_UL_MUMIMO_TRIG_STATS = 27,
+
+    /* HTT_DBG_EXT_STATS_FSE_RX
+     * PARAMS:
+     *   - No Params
+     * RESP MSG:
+     *   - htt_rx_fse_stats_t
+     */
+    HTT_DBG_EXT_STATS_FSE_RX = 28,
+
     /* keep this last */
     HTT_DBG_NUM_EXT_STATS = 256,
 };
@@ -421,6 +438,9 @@ typedef enum {
     HTT_STATS_RX_PDEV_UL_TRIG_STATS_TAG            = 94, /* htt_rx_pdev_ul_trigger_stats_tlv */
     HTT_STATS_RX_PDEV_UL_OFDMA_USER_STATS_TAG      = 95, /* htt_rx_pdev_ul_ofdma_user_stats_tlv */
     HTT_STATS_RX_PDEV_UL_MIMO_USER_STATS_TAG       = 96, /* htt_rx_pdev_ul_mimo_user_stats_tlv */
+    HTT_STATS_RX_PDEV_UL_MUMIMO_TRIG_STATS_TAG     = 97, /* htt_rx_pdev_ul_mumimo_trig_stats_tlv */
+    HTT_STATS_RX_FSE_STATS_TAG                     = 98, /* htt_rx_fse_stats_tlv */
+    HTT_STATS_PEER_SCHED_STATS_TAG                 = 99, /* htt_peer_sched_stats_tlv */
 
     HTT_STATS_MAX_TAG,
 } htt_tlv_tag_t;
@@ -652,6 +672,10 @@ typedef struct {
     A_UINT32 next_seq_cancel;
     /* Num of times fes offset was misaligned */
     A_UINT32 fes_offsets_err_cnt;
+    /* Num of times peer blacklisted for MU-MIMO transmission */
+    A_UINT32 num_mu_peer_blacklisted;
+    /* Num of times mu_ofdma seq posted */
+    A_UINT32 mu_ofdma_seq_posted;
 } htt_tx_pdev_stats_cmn_tlv;
 
 #define HTT_TX_PDEV_STATS_URRN_TLV_SZ(_num_elems) (sizeof(A_UINT32) * (_num_elems))
@@ -1196,7 +1220,8 @@ typedef enum {
     HTT_STATS_PREAM_COUNT,
 } HTT_STATS_PREAM_TYPE;
 
-#define HTT_TX_PEER_STATS_NUM_MCS_COUNTERS 12
+#define HTT_TX_PEER_STATS_NUM_MCS_COUNTERS 12 /* 0-11 */
+#define HTT_TX_PEER_STATS_NUM_EXTRA_MCS_COUNTERS 2 /* 12, 13 */
 /* HTT_TX_PEER_STATS_NUM_GI_COUNTERS:
  * GI Index 0:  WHAL_GI_800
  * GI Index 1:  WHAL_GI_400
@@ -1245,9 +1270,17 @@ typedef struct _htt_tx_peer_rate_stats_tlv {
 
     /* Counters to track packets in dcm mcs (MCS 0, 1, 3, 4) */
     A_UINT32 tx_dcm[HTT_TX_PEER_STATS_NUM_DCM_COUNTERS];
+
+    /* Stats for MCS 12/13 */
+    A_UINT32 tx_mcs_ext[HTT_TX_PEER_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 tx_su_mcs_ext[HTT_TX_PEER_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 tx_mu_mcs_ext[HTT_TX_PEER_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 tx_stbc_ext[HTT_TX_PEER_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 tx_gi_ext[HTT_TX_PEER_STATS_NUM_GI_COUNTERS][HTT_TX_PEER_STATS_NUM_EXTRA_MCS_COUNTERS];
 } htt_tx_peer_rate_stats_tlv;
 
-#define HTT_RX_PEER_STATS_NUM_MCS_COUNTERS 12
+#define HTT_RX_PEER_STATS_NUM_MCS_COUNTERS 12 /* 0-11 */
+#define HTT_RX_PEER_STATS_NUM_EXTRA_MCS_COUNTERS 2 /* 12, 13 */
 #define HTT_RX_PEER_STATS_NUM_GI_COUNTERS 4
 #define HTT_RX_PEER_STATS_NUM_DCM_COUNTERS 5
 #define HTT_RX_PEER_STATS_NUM_BW_COUNTERS 4
@@ -1299,6 +1332,11 @@ typedef struct _htt_rx_peer_rate_stats_tlv {
     A_UINT32 rx_ulmumimo_mpdu_fail;       /* mpdu level */
 
     A_UINT8  rssi_chain_ext[HTT_RX_PEER_STATS_NUM_SPATIAL_STREAMS][HTT_RX_PEER_STATS_NUM_BW_EXT_COUNTERS]; /* units = dB above noise floor */
+
+    /* Stats for MCS 12/13 */
+    A_UINT32 rx_mcs_ext[HTT_RX_PEER_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 rx_stbc_ext[HTT_RX_PEER_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 rx_gi_ext[HTT_RX_PEER_STATS_NUM_GI_COUNTERS][HTT_RX_PEER_STATS_NUM_EXTRA_MCS_COUNTERS];
 } htt_rx_peer_rate_stats_tlv;
 
 typedef enum {
@@ -1315,9 +1353,25 @@ typedef enum {
     HTT_TX_TID_STATS_TLV       = 4,
     HTT_RX_TID_STATS_TLV       = 5,
     HTT_MSDU_FLOW_STATS_TLV    = 6,
+    HTT_PEER_SCHED_STATS_TLV   = 7,
 
     HTT_PEER_STATS_MAX_TLV     = 31,
 } htt_peer_stats_tlv_enum;
+
+typedef struct {
+    htt_tlv_hdr_t tlv_hdr;
+    A_UINT32 peer_id;
+    /* Num of DL schedules for peer */
+    A_UINT32 num_sched_dl;
+    /* Num od UL schedules for peer */
+    A_UINT32 num_sched_ul;
+    /* Peer TX time */
+    A_UINT32 peer_tx_active_dur_us_low;
+    A_UINT32 peer_tx_active_dur_us_high;
+    /* Peer RX time */
+    A_UINT32 peer_rx_active_dur_us_low;
+    A_UINT32 peer_rx_active_dur_us_high;
+} htt_peer_sched_stats_tlv;
 
 /* config_param0 */
 #define HTT_DBG_EXT_STATS_PEER_INFO_IS_MAC_ADDR_M 0x00000001
@@ -1367,6 +1421,7 @@ typedef enum {
  *   - HTT_STATS_RX_TID_DETAILS_TAG (multiple)
  *   - HTT_STATS_PEER_MSDU_FLOWQ_TAG (multiple)
  *   - HTT_STATS_TX_TID_DETAILS_V1_TAG (multiple)
+ *   - HTT_STATS_PEER_SCHED_STATS_TAG
  */
 /* NOTE:
  * This structure is for documentation, and cannot be safely used directly.
@@ -1383,6 +1438,7 @@ typedef struct _htt_peer_stats {
     htt_rx_tid_stats_tlv       rx_tid_stats[1];
     htt_msdu_flow_stats_tlv    msdu_flowq[1];
     htt_tx_tid_stats_v1_tlv    tx_tid_stats_v1[1];
+    htt_peer_sched_stats_tlv   peer_sched_stats;
 } htt_peer_stats_t;
 
 /* =========== ACTIVE PEER LIST ========== */
@@ -1654,6 +1710,11 @@ typedef struct _htt_tx_hwq_stats {
         ((_var) |= ((_val) << HTT_TX_SELFGEN_CMN_STATS_MAC_ID_S)); \
     } while (0)
 
+#define HTT_TX_PDEV_STATS_NUM_AC_MUMIMO_USER_STATS 4
+#define HTT_TX_PDEV_STATS_NUM_AX_MUMIMO_USER_STATS 8
+#define HTT_TX_PDEV_STATS_NUM_OFDMA_USER_STATS 74
+#define HTT_TX_PDEV_STATS_NUM_UL_MUMIMO_USER_STATS 8
+
 typedef struct {
     htt_tlv_hdr_t tlv_hdr;
 
@@ -1738,6 +1799,7 @@ typedef struct {
     A_UINT32 ax_mu_bar_trigger_err;
     A_UINT32 ax_mu_rts_trigger_err;
     A_UINT32 ax_ulmumimo_trigger_err;
+    A_UINT32 ax_mu_mimo_brp_err_num_cbf_received[HTT_TX_PDEV_STATS_NUM_AX_MUMIMO_USER_STATS];
 } htt_tx_selfgen_ax_err_stats_tlv;
 
 /* STATS_TYPE : HTT_DBG_EXT_STATS_TX_SELFGEN_INFO
@@ -1765,11 +1827,6 @@ typedef struct {
 } htt_tx_pdev_selfgen_stats_t;
 
 /* == TX MU STATS == */
-
-#define HTT_TX_PDEV_STATS_NUM_AC_MUMIMO_USER_STATS 4
-#define HTT_TX_PDEV_STATS_NUM_AX_MUMIMO_USER_STATS 8
-#define HTT_TX_PDEV_STATS_NUM_OFDMA_USER_STATS 74
-#define HTT_TX_PDEV_STATS_NUM_UL_MUMIMO_USER_STATS 8
 
 typedef struct {
     htt_tlv_hdr_t tlv_hdr;
@@ -1880,7 +1937,7 @@ typedef struct {
 /* NOTE: Variable length TLV, use length spec to infer array size */
 typedef struct {
     htt_tlv_hdr_t tlv_hdr;
-    /* Scheduler command posted per tx_mode su / mu mimo 11ac / mu mimo 11ax / mu ofdma */
+    /* Scheduler command posted per tx_mode */
     A_UINT32 sched_cmd_posted[1]; /* HTT_TX_PDEV_SCHED_TX_MODE_MAX */
 } htt_sched_txq_cmd_posted_tlv_v;
 
@@ -1889,7 +1946,7 @@ typedef struct {
 /* NOTE: Variable length TLV, use length spec to infer array size */
 typedef struct {
     htt_tlv_hdr_t tlv_hdr;
-    /* Scheduler command reaped per tx_mode su / mu mimo 11ac / mu mimo 11ax / mu ofdma */
+    /* Scheduler command reaped per tx_mode */
     A_UINT32 sched_cmd_reaped[1]; /* HTT_TX_PDEV_SCHED_TX_MODE_MAX */
 } htt_sched_txq_cmd_reaped_tlv_v;
 
@@ -2023,6 +2080,12 @@ typedef struct {
     A_UINT32 su_min_txtime_sched_delay;
     /* scheduled via no delay */
     A_UINT32 su_no_delay;
+    /* Num of supercycles for this TxQ */
+    A_UINT32 num_supercycles;
+    /* Num of subcycles with sort for this TxQ */
+    A_UINT32 num_subcycles_with_sort;
+    /* Num of subcycles without sort for this Txq */
+    A_UINT32 num_subcycles_no_sort;
 } htt_tx_pdev_stats_sched_per_txq_tlv;
 
 #define HTT_STATS_TX_SCHED_CMN_MAC_ID_M 0x000000ff
@@ -2964,7 +3027,8 @@ typedef struct {
 
 /* == PDEV TX RATE CTRL STATS == */
 
-#define HTT_TX_PDEV_STATS_NUM_MCS_COUNTERS 12
+#define HTT_TX_PDEV_STATS_NUM_MCS_COUNTERS 12 /* 0-11 */
+#define HTT_TX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS 2 /* 12, 13 */
 #define HTT_TX_PDEV_STATS_NUM_GI_COUNTERS 4
 #define HTT_TX_PDEV_STATS_NUM_DCM_COUNTERS 5
 #define HTT_TX_PDEV_STATS_NUM_BW_COUNTERS 4
@@ -3067,6 +3131,15 @@ typedef struct {
     A_UINT32 ofdma_tx_gi[HTT_TX_PDEV_STATS_NUM_GI_COUNTERS][HTT_TX_PDEV_STATS_NUM_MCS_COUNTERS];
     A_UINT32 trigger_type_11ax[HTT_TX_PDEV_STATS_NUM_11AX_TRIGGER_TYPES];
     A_UINT32 tx_11ax_su_ext;
+
+    /* Stats for MCS 12/13 */
+    A_UINT32 tx_mcs_ext[HTT_TX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 tx_stbc_ext[HTT_TX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 tx_gi_ext[HTT_TX_PDEV_STATS_NUM_GI_COUNTERS][HTT_TX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 ax_mu_mimo_tx_mcs_ext[HTT_TX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 ofdma_tx_mcs_ext[HTT_TX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 ax_mu_mimo_tx_gi_ext[HTT_TX_PDEV_STATS_NUM_GI_COUNTERS][HTT_TX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 ofdma_tx_gi_ext[HTT_TX_PDEV_STATS_NUM_GI_COUNTERS][HTT_TX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS];
 } htt_tx_pdev_rate_stats_tlv;
 
 /* STATS_TYPE : HTT_DBG_EXT_STATS_PDEV_TX_RATE
@@ -3085,11 +3158,13 @@ typedef struct {
 
 #define HTT_RX_PDEV_STATS_NUM_LEGACY_CCK_STATS 4
 #define HTT_RX_PDEV_STATS_NUM_LEGACY_OFDM_STATS 8
-#define HTT_RX_PDEV_STATS_NUM_MCS_COUNTERS 12
+#define HTT_RX_PDEV_STATS_NUM_MCS_COUNTERS 12 /* 0-11 */
+#define HTT_RX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS 2 /* 12, 13 */
 #define HTT_RX_PDEV_STATS_NUM_GI_COUNTERS 4
 #define HTT_RX_PDEV_STATS_NUM_DCM_COUNTERS 5
 #define HTT_RX_PDEV_STATS_NUM_BW_COUNTERS 4
 #define HTT_RX_PDEV_STATS_NUM_SPATIAL_STREAMS 8
+#define HTT_RX_PDEV_STATS_ULMUMIMO_NUM_SPATIAL_STREAMS 8
 #define HTT_RX_PDEV_STATS_NUM_PREAMBLE_TYPES HTT_STATS_PREAM_COUNT
 #define HTT_RX_PDEV_MAX_OFDMA_NUM_USER 8
 #define HTT_RX_PDEV_MAX_ULMUMIMO_NUM_USER 8
@@ -3215,6 +3290,16 @@ typedef struct {
     A_UINT32 rx_ulmumimo_mpdu_fail[HTT_RX_PDEV_MAX_ULMUMIMO_NUM_USER];     /* mpdu level */
     A_UINT32 rx_ulofdma_non_data_nusers[HTT_RX_PDEV_MAX_OFDMA_NUM_USER];
     A_UINT32 rx_ulofdma_data_nusers[HTT_RX_PDEV_MAX_OFDMA_NUM_USER];
+
+    /* Stats for MCS 12/13 */
+    A_UINT32 rx_mcs_ext[HTT_RX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 rx_stbc_ext[HTT_RX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 rx_gi_ext[HTT_RX_PDEV_STATS_NUM_GI_COUNTERS][HTT_RX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 ul_ofdma_rx_mcs_ext[HTT_RX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 ul_ofdma_rx_gi_ext[HTT_TX_PDEV_STATS_NUM_GI_COUNTERS][HTT_RX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 rx_11ax_su_txbf_mcs_ext[HTT_RX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 rx_11ax_mu_txbf_mcs_ext[HTT_RX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 rx_11ax_dl_ofdma_mcs_ext[HTT_RX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS];
 } htt_rx_pdev_rate_stats_tlv;
 
 /* STATS_TYPE : HTT_DBG_EXT_STATS_PDEV_RX_RATE
@@ -3267,6 +3352,9 @@ typedef struct {
     A_UINT32 rx_ulofdma_data_ru_size_ppdu[HTT_RX_PDEV_STATS_NUM_RU_SIZE_160MHZ_CNTRS];      /* ppdu level */
     A_UINT32 rx_ulofdma_non_data_ru_size_ppdu[HTT_RX_PDEV_STATS_NUM_RU_SIZE_160MHZ_CNTRS];  /* ppdu level */
 
+    /* Stats for MCS 12/13 */
+    A_UINT32 ul_ofdma_rx_mcs_ext[HTT_RX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 ul_ofdma_rx_gi_ext[HTT_RX_PDEV_STATS_NUM_GI_COUNTERS][HTT_RX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS];
 } htt_rx_pdev_ul_trigger_stats_tlv;
 
 /* STATS_TYPE : HTT_DBG_EXT_STATS_PDEV_UL_TRIG_STATS
@@ -3303,6 +3391,39 @@ typedef struct {
 } htt_rx_pdev_ul_mimo_user_stats_tlv;
 
 /* == RX PDEV/SOC STATS == */
+
+typedef struct {
+    htt_tlv_hdr_t tlv_hdr;
+
+    /*
+     * BIT [7:0]  :- mac_id
+     * BIT [31:8] :- reserved
+     *
+     * Refer to HTT_STATS_CMN_MAC_ID_GET/SET macros.
+     */
+    A_UINT32 mac_id__word;
+
+    A_UINT32 rx_11ax_ul_mumimo;
+
+    A_UINT32 ul_mumimo_rx_mcs[HTT_RX_PDEV_STATS_NUM_MCS_COUNTERS];
+    A_UINT32 ul_mumimo_rx_gi[HTT_RX_PDEV_STATS_NUM_GI_COUNTERS][HTT_RX_PDEV_STATS_NUM_MCS_COUNTERS];
+    A_UINT32 ul_mumimo_rx_nss[HTT_RX_PDEV_STATS_ULMUMIMO_NUM_SPATIAL_STREAMS];
+    A_UINT32 ul_mumimo_rx_bw[HTT_RX_PDEV_STATS_NUM_BW_COUNTERS];
+    A_UINT32 ul_mumimo_rx_stbc;
+    A_UINT32 ul_mumimo_rx_ldpc;
+
+    /* Stats for MCS 12/13 */
+    A_UINT32 ul_mumimo_rx_mcs_ext[HTT_RX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS];
+    A_UINT32 ul_mumimo_rx_gi_ext[HTT_RX_PDEV_STATS_NUM_GI_COUNTERS][HTT_RX_PDEV_STATS_NUM_EXTRA_MCS_COUNTERS];
+} htt_rx_pdev_ul_mumimo_trig_stats_tlv;
+
+/* STATS_TYPE : HTT_DBG_EXT_STATS_PDEV_UL_MUMIMO_TRIG_STATS
+ * TLV_TAGS:
+ *    - HTT_STATS_RX_PDEV_UL_MUMIMO_TRIG_STATS_TAG
+ */
+typedef struct {
+    htt_rx_pdev_ul_mumimo_trig_stats_tlv ul_mumimo_trig_tlv;
+} htt_rx_pdev_ul_mumimo_trig_stats_t;
 
 typedef struct {
     htt_tlv_hdr_t tlv_hdr;
@@ -3996,11 +4117,24 @@ typedef struct {
         A_UINT32 num_sr_tx_transmissions; /* CORRECTED - use this one */
         A_UINT32 num_sr_tx_tranmissions;  /* DEPRECATED - has typo in name */
     };
-    /* num_sr_rx_ge_pd_rssi_thr
-     * counter of rx from other BSS for which RSSI was above the
-     * packet-detection threshold specified for enabling spatial reuse
-     */
-    A_UINT32 num_sr_rx_ge_pd_rssi_thr;
+    union {
+        /*
+         * Count the number of times the RSSI from an other-BSS signal
+         * is below the spatial reuse power threshold, thus providing an
+         * opportunity for spatial reuse since OBSS interference will be
+         * inconsequential.
+         */
+        A_UINT32 num_spatial_reuse_opportunities;
+
+        /* DEPRECATED: num_sr_rx_ge_pd_rssi_thr
+         * This old name has been deprecated because it does not
+         * clearly and accurately reflect the information stored within
+         * this field.
+         * Use the new name (num_spatial_reuse_opportunities) instead of
+         * the deprecated old name (num_sr_rx_ge_pd_rssi_thr).
+         */
+        A_UINT32 num_sr_rx_ge_pd_rssi_thr;
+    };
 } htt_pdev_obss_pd_stats_tlv;
 
 /* NOTE:
@@ -4116,6 +4250,131 @@ typedef struct {
     htt_latency_prof_ctx_tlv latency_ctx_stat;
     htt_latency_prof_cnt_tlv latency_cnt_stat;
 } htt_soc_latency_stats_t;
+
+#define HTT_RX_MAX_PEAK_OCCUPANCY_INDEX 10
+#define HTT_RX_MAX_CURRENT_OCCUPANCY_INDEX 10
+#define HTT_RX_SQUARE_INDEX 6
+#define HTT_RX_MAX_PEAK_SEARCH_INDEX 4
+#define HTT_RX_MAX_PENDING_SEARCH_INDEX 4
+
+/* STATS_TYPE : HTT_DBG_EXT_RX_FSE_STATS
+ * TLV_TAGS:
+ *    - HTT_STATS_RX_FSE_STATS_TAG
+ */
+typedef struct {
+    htt_tlv_hdr_t tlv_hdr;
+
+    /*
+     * Number of times host requested for fse enable/disable
+     */
+    A_UINT32 fse_enable_cnt;
+    A_UINT32 fse_disable_cnt;
+    /*
+     * Number of times host requested for fse cache invalidation
+     * individual entries or full cache
+     */
+    A_UINT32 fse_cache_invalidate_entry_cnt;
+    A_UINT32 fse_full_cache_invalidate_cnt;
+
+    /*
+     * Cache hits count will increase if there is a matching flow in the cache
+     * There is no register for cache miss but the number of cache misses can
+     * be calculated as
+     *    cache miss = (num_searches - cache_hits)
+     * Thus, there is no need to have a separate variable for cache misses.
+     * Num searches is flow search times done in the cache.
+     */
+    A_UINT32 fse_num_cache_hits_cnt;
+    A_UINT32 fse_num_searches_cnt;
+    /**
+     * Cache Occupancy holds 2 types of values: Peak and Current.
+     * 10 bins are used to keep track of peak occupancy.
+     * 8 of these bins represent ranges of values, while the first and last
+     * bins represent the extreme cases of the cache being completely empty
+     * or completely full.
+     * For the non-extreme bins, the number of cache occupancy values per
+     * bin is the maximum cache occupancy (128), divided by the number of
+     * non-extreme bins (8), so 128/8 = 16 values per bin.
+     * The range of values for each histogram bins is specified below:
+     * Bin0 = Counter increments when cache occupancy is empty
+     * Bin1 = Counter increments when cache occupancy is within [1 to 16]
+     * Bin2 = Counter increments when cache occupancy is within [17 to 32]
+     * Bin3 = Counter increments when cache occupancy is within [33 to 48]
+     * Bin4 = Counter increments when cache occupancy is within [49 to 64]
+     * Bin5 = Counter increments when cache occupancy is within [65 to 80]
+     * Bin6 = Counter increments when cache occupancy is within [81 to 96]
+     * Bin7 = Counter increments when cache occupancy is within [97 to 112]
+     * Bin8 = Counter increments when cache occupancy is within [113 to 127]
+     * Bin9 = Counter increments when cache occupancy is equal to 128
+     * The above histogram bin definitions apply to both the peak-occupancy
+     * histogram and the current-occupancy histogram.
+     *
+     * @fse_cache_occupancy_peak_cnt:
+     * Array records periodically PEAK cache occupancy values.
+     * Peak Occupancy will increment only if it is greater than current
+     * occupancy value.
+     *
+     * @fse_cache_occupancy_curr_cnt:
+     * Array records periodically current cache occupancy value.
+     * Current Cache occupancy always holds instant snapshot of
+     * current number of cache entries.
+     **/
+    A_UINT32 fse_cache_occupancy_peak_cnt[HTT_RX_MAX_PEAK_OCCUPANCY_INDEX];
+    A_UINT32 fse_cache_occupancy_curr_cnt[HTT_RX_MAX_CURRENT_OCCUPANCY_INDEX];
+    /*
+     * Square stat is sum of squares of cache occupancy to better understand
+     * any variation/deviation within each cache set, over a given time-window.
+     *
+     * Square stat is calculated this way:
+     *     Square =  SUM(Squares of all Occupancy in a Set) / 8
+     * The cache has 16-way set associativity, so the occupancy of a
+     * set can vary from 0 to 16.  There are 8 sets within the cache.
+     * Therefore, the minimum possible square value is 0, and the maximum
+     * possible square value is (8*16^2) / 8 = 256.
+     *
+     * 6 bins are used to keep track of square stats:
+     * Bin0 = increments when square of current cache occupancy is zero
+     * Bin1 = increments when square of current cache occupancy is within
+     *        [1 to 50]
+     * Bin2 = increments when square of current cache occupancy is within
+     *        [51 to 100]
+     * Bin3 = increments when square of current cache occupancy is within
+     *        [101 to 200]
+     * Bin4 = increments when square of current cache occupancy is within
+     *        [201 to 255]
+     * Bin5 = increments when square of current cache occupancy is 256
+     */
+    A_UINT32 fse_search_stat_square_cnt[HTT_RX_SQUARE_INDEX];
+    /**
+     * Search stats has 2 types of values: Peak Pending and Number of
+     * Search Pending.
+     * GSE command ring for FSE can hold maximum of 5 Pending searches
+     * at any given time.
+     *
+     * 4 bins are used to keep track of search stats:
+     * Bin0 = Counter increments when there are NO pending searches
+     *        (For peak, it will be number of pending searches greater
+     *        than GSE command ring FIFO outstanding requests.
+     *        For Search Pending, it will be number of pending search
+     *        inside GSE command ring FIFO.)
+     * Bin1 = Counter increments when number of pending searches are within
+     *        [1 to 2]
+     * Bin2 = Counter increments when number of pending searches are within
+     *        [3 to 4]
+     * Bin3 = Counter increments when number of pending searches are
+     *        greater/equal to [ >= 5]
+     */
+    A_UINT32 fse_search_stat_peak_cnt[HTT_RX_MAX_PEAK_SEARCH_INDEX];
+    A_UINT32 fse_search_stat_search_pending_cnt[HTT_RX_MAX_PENDING_SEARCH_INDEX];
+} htt_rx_fse_stats_tlv;
+
+/* NOTE:
+ * This structure is for documentation, and cannot be safely used directly.
+ * Instead, use the constituent TLV structures to fill/parse.
+ */
+typedef struct {
+    htt_rx_fse_stats_tlv rx_fse_stats;
+} htt_rx_fse_stats_t;
 
 
 #endif /* __HTT_STATS_H__ */
